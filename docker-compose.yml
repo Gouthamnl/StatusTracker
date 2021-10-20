@@ -1,0 +1,8 @@
+version: '3.4'
+
+services:
+  trackingservicerunner:
+    image: ${ECR_REPOSITORY_URI}
+    build:
+      context: .
+      dockerfile: TrackingServiceRunner/Dockerfile

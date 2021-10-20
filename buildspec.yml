@@ -1,0 +1,38 @@
+version: 0.2 
+phases:
+  install:
+    runtime-versions:
+      docker: 18
+  pre_build: 
+    commands: 
+      - echo Logging in to Amazon ECR ... 
+      - $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email) 
+      - echo Logged in to Amazon ECR successfully! 
+      - IMAGE_TAG=build-$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}') 
+      - echo Docker image image tag $IMAGE_TAG  
+    finally: 
+     - echo Pre-build phase ended. 
+  build: 
+    commands:       
+      - echo Building the Docker image ... 
+      - echo "Building Api image..." 
+      - docker build --file StatusTracker.Api/Dockerfile-Api -t="$API_ECR_REPOSITORY_URI:$LIVE_ENV_DOCKER_TAG" . 
+      - echo "Api image built successfuly." 
+       echo "Building Worker image..." 
+      - docker build --file TrackingServiceRunner/Dockerfile -t $ECR_REPOSITORY_URI:$LIVE_ENV_DOCKER_TAG .
+      - echo "Worker image built successfuly." 
+    finally: 
+      - echo Build phase ended. 
+  post_build: 
+    commands: 
+      - docker push $API_ECR_REPOSITORY_URI:$LIVE_ENV_DOCKER_TAG      
+      - docker push $ECR_REPOSITORY_URI:$LIVE_ENV_DOCKER_TAG
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$API_CONTAINER_NAME" "$API_ECR_REPOSITORY_URI:$LIVE_ENV_DOCKER_TAG" > api_image.json
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$CONTAINER_NAME" "$ECR_REPOSITORY_URI:$LIVE_ENV_DOCKER_TAG" > worker_image.json
+    finally: 
+      - echo Post build phase ended. 
+artifacts: 
+  discard-paths: yes 
+  files: 
+    - api_image.json
+    - worker_image.json
